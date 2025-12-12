@@ -8,6 +8,9 @@ import (
 	"unsafe"
 )
 
+// 特殊的标准错误，处理将错误输出到 [os.Stderr],
+// 还会检测是否有TLS握手错误，如果有封禁ip。
+// 属于实验性API
 var Stderr io.Writer = &w{}
 
 type w struct{ r *Rules }
@@ -25,8 +28,12 @@ func (wr w) Write(b []byte) (int, error) {
 	return os.Stderr.Write(b)
 }
 
+// Log 从日志中自动分析并封禁ip
+// 属于实验性API
 var Log = log.New(Stderr, "", 0)
 
+// Init 将r传递给Stderr
+// 属于实验性API
 func Init(r *Rules) {
 	Stderr.(*w).r = r
 }

@@ -1,3 +1,4 @@
+// Package 提供持久化封禁ip
 package ipblock
 
 import (
