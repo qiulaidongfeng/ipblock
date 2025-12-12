@@ -16,7 +16,6 @@ var match_prefix_path_rule = []string{
 	"/config",
 	"/.git",
 	"/..",
-	"/cgi-bin",
 }
 
 // MayAttack 通过检查urlpath判断是否可能是恶意攻击
