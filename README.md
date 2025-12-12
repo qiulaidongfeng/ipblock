@@ -1,6 +1,6 @@
 # ipblock
 
-提供持久化封禁ip
+提供持久化封禁ip的库
 
 将被封禁ip保存在指定路径的json文件
 
@@ -47,6 +47,7 @@ func Main() {
 	}
 	m := http.NewServeMux()
 	m.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+        // 仅示例，实践中应该在某个中间件进行检测
 		if ipblock.MayAttack(req.URL.Path) {
 			ip, _, err := net.SplitHostPort(req.RemoteAddr)
 			if err != nil {
