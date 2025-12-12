@@ -32,6 +32,7 @@ func (r *Rules) Save() error {
 	if err != nil {
 		return err
 	}
+	defer fd.Close()
 	d := json.NewEncoder(fd)
 	d.SetIndent("", "\t")
 	var m = make(map[string]struct{})
@@ -49,6 +50,7 @@ func (r *Rules) Init(path string) error {
 	if err != nil {
 		return err
 	}
+	defer fd.Close()
 	d := json.NewDecoder(fd)
 	var m = make(map[string]struct{})
 	err = d.Decode(&m)
