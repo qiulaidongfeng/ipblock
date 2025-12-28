@@ -23,7 +23,7 @@ func (wr w) Write(b []byte) (int, error) {
 	if strings.Contains(s, "TLS handshake error from ") {
 		sep := strings.Split(s, "TLS handshake error from ")
 		sep = strings.Split(sep[1], ":")
-		wr.r.Add(sep[0])
+		wr.r.Add(sep[0], "tls scan")
 	}
 	return os.Stderr.Write(b)
 }

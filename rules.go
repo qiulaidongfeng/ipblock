@@ -2,8 +2,12 @@ package ipblock
 
 import (
 	"encoding/json"
+	"io"
 	"os"
+	"slices"
+	"strings"
 	"sync"
+	"time"
 )
 
 // Rules 表示被阻止ip的规则集合
@@ -13,11 +17,17 @@ type Rules struct {
 	m    sync.Mutex
 }
 
-func (r *Rules) Add(ip string) {
-	r.ips.Store(ip, struct{}{})
-	if err := r.Save(); err != nil {
+func (r *Rules) Add(ip, reason string) {
+	r.ips.Store(ip, entry{Time: time.Now(), Reason: reason})
+	if err := r.update(); err != nil {
 		panic(err)
 	}
+}
+
+type entry struct {
+	Ip     string
+	Time   time.Time
+	Reason string
 }
 
 func (r *Rules) IsBlock(ip string) bool {
@@ -25,7 +35,13 @@ func (r *Rules) IsBlock(ip string) bool {
 	return ok
 }
 
-func (r *Rules) Save() error {
+// update 将新数据写入磁盘
+func (r *Rules) update() error {
+	// 加锁确保不会发生
+	// g1和g2并发执行
+	// g1是旧规则
+	// g2是新规则并写入磁盘
+	// g1写入旧规则到磁盘
 	r.m.Lock()
 	defer r.m.Unlock()
 	fd, err := os.Create(r.path)
@@ -35,15 +51,40 @@ func (r *Rules) Save() error {
 	defer fd.Close()
 	d := json.NewEncoder(fd)
 	d.SetIndent("", "\t")
-	var m = make(map[string]struct{})
+
+	// 获取最新规则
+	var m = make([]entry, 0)
 	r.ips.Range(func(key, value any) bool {
-		m[key.(string)] = struct{}{}
+		e := value.(entry)
+		m = append(m, entry{Ip: key.(string), Time: e.Time, Reason: e.Reason})
 		return true
 	})
+
+	// 排序
+	// 没有时间戳的按ip字典顺序排最前
+	// 有时间戳的按时间先后排序
+	slices.SortFunc(m, func(a, b entry) int {
+		if !a.Time.IsZero() && !b.Time.IsZero() {
+			return a.Time.Compare(b.Time)
+		}
+		if a.Time.IsZero() && b.Time.IsZero() {
+			return strings.Compare(a.Ip, b.Ip)
+		}
+		if a.Time.IsZero() {
+			return -1
+		}
+		if b.Time.IsZero() {
+			return 1
+		}
+		panic("不可达路径")
+	})
+
 	err = d.Encode(&m)
 	return err
 }
 
+// Init 读取磁盘中的旧数据
+// 没有则创建新文件
 func (r *Rules) Init(path string) error {
 	r.path = path
 	fd, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_RDONLY, 0600)
@@ -51,14 +92,41 @@ func (r *Rules) Init(path string) error {
 		return err
 	}
 	defer fd.Close()
+	//尝试按旧方式读取规则
+	err = r.try_old_decoer(fd)
+	if err == nil {
+		return nil
+	}
+	// 读取新方式保存的规则
+	_, err = fd.Seek(0, io.SeekStart)
+	if err != nil {
+		return err
+	}
+	return r.try_new_decoer(fd)
+}
+
+func (r *Rules) try_old_decoer(fd *os.File) error {
 	d := json.NewDecoder(fd)
 	var m = make(map[string]struct{})
-	err = d.Decode(&m)
+	err := d.Decode(&m)
 	if err != nil {
 		return err
 	}
 	for k := range m {
-		r.ips.Store(k, struct{}{})
+		r.ips.Store(k, entry{})
+	}
+	return nil
+}
+
+func (r *Rules) try_new_decoer(fd *os.File) error {
+	d := json.NewDecoder(fd)
+	var m = make([]entry, 0)
+	err := d.Decode(&m)
+	if err != nil {
+		return err
+	}
+	for _, v := range m {
+		r.ips.Store(v.Ip, v)
 	}
 	return nil
 }

@@ -20,6 +20,6 @@ var r = new(Rules)
 
 func init() {
 	r.Init("./ipblock.json")
-	r.Add("127.0.0.2")
+	r.Add("127.0.0.2", "tls scan")
 	Init(r)
 }
