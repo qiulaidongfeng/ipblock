@@ -12,15 +12,19 @@ import (
 
 // Rules 表示被阻止ip的规则集合
 type Rules struct {
-	ips  sync.Map
-	path string
-	m    sync.Mutex
+	ips    sync.Map
+	path   string
+	m      sync.Mutex
+	report Report
 }
 
 func (r *Rules) Add(ip, reason string) {
 	r.ips.Store(ip, entry{Time: time.Now(), Reason: reason})
 	if err := r.update(); err != nil {
 		panic(err)
+	}
+	if r.report != nil {
+		r.report.Report(ip, reason)
 	}
 }
 
@@ -85,8 +89,9 @@ func (r *Rules) update() error {
 
 // Init 读取磁盘中的旧数据
 // 没有则创建新文件
-func (r *Rules) Init(path string) error {
+func (r *Rules) Init(path string, report Report) error {
 	r.path = path
+	r.report = report
 	fd, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_RDONLY, 0600)
 	if err != nil {
 		return err

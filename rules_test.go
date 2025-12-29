@@ -19,7 +19,7 @@ func TestAttack(t *testing.T) {
 var r = new(Rules)
 
 func init() {
-	r.Init("./ipblock.json")
+	r.Init("./ipblock.json", nil)
 	r.Add("127.0.0.2", "tls scan")
 	Init(r)
 }
